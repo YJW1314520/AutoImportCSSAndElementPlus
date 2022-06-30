@@ -27,14 +27,16 @@ export default function myPlugin () {
             string1 += `import './${ idName }.css';`
           }
         }
-        const x = Array.from(new Set(z.match(/El[A-Z][a-z]*/g)))
+        const x = Array.from(new Set(z.match(/El[A-Z][A-Za-z]*/g)))
         if (x.length === 0) return
         for (const i of x) {
+          // 修复逻辑,因为有些组件是多词汇,比如ElTimePicker,其对应文件夹为time-picker
           string1 += `import 'element-plus/es/components/${
             i
+            .replace(/([A-Z])/g, '-$1')
             .toLowerCase()
-            .slice(2) }/style/css';`
-          if (!z.match(new RegExp(`import.*${ i }[^{}]*}`, 'g'))) {
+            .slice(4) }/style/css';`
+          if (!z.match(new RegExp(`import.*${ i }[^{}]*}`))) {
             string2 += `${ i },`
           }
         }
