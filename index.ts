@@ -1,10 +1,28 @@
 // [x] 自动引入css文件+自动导入element-plus组件
-import { readFileSync, readdirSync } from 'fs'
+import { readFileSync, readdirSync, writeFileSync } from 'fs'
 import { type Plugin } from 'vite'
 
-export default function myPlugin () {
+export default function autoImport (config:{[x:string]:string[]}) {
+  // 依据配置自动生成声明文件
+  if (Object.keys(config).length > 0) {
+    let str = '/* eslint-disable no-unused-vars */'
+    for (const [pck, pckExport] of Object.entries(config)) {
+      for (const i of pckExport) {
+        str += `declare let ${ i }:typeof import('${ pck }')['${ i }']
+`
+      }
+    }
+    if (!readdirSync('./')
+      .includes('autoImport.d.ts') && !readdirSync('./src')
+      .includes('autoImport.d.ts') && !readdirSync('./src/types/')
+      .includes('autoImport.d.ts')) {
+      writeFileSync('./src/types/autoImport.d.ts', str)
+    } else {
+      console.warn('autoImport.d.ts文件已经存在了')
+    }
+  }
   return {
-    name: 'autoImportElementPlus', // 插件名
+    name: 'autoImport', // 插件名
     /**
      * 该函数对每一个要加载的文件调用，参数id就是它们的文件名
      * 它自带缓存
@@ -30,7 +48,6 @@ export default function myPlugin () {
         const x = Array.from(new Set(z.match(/El[A-Z][A-Za-z]*/g)))
         if (x.length === 0) return
         for (const i of x) {
-          // 修复逻辑,因为有些组件是多词汇,比如ElTimePicker,其对应文件夹为time-picker
           string1 += `import 'element-plus/es/components/${
             i
             .replace(/([A-Z])/g, '-$1')
