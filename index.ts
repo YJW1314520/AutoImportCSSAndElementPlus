@@ -14,17 +14,19 @@ export default function myPlugin () {
      */
     load (id) {
       if (id.match(/\.tsx/)) {
+        const z = readFileSync(id)
+          .toString()
         let string1 = ''
         let string2 = ''
         const matchString = /(?<=\/)[^/]*(?=\.tsx)/
         const idName = id.match(matchString)?.[0]
         // 尝试着读取该目录下是否有同名css
-        if (idName && readdirSync(id.slice(0, id.length - idName.length - 5))
+        if (idName && readdirSync(id.slice(0, id.length - (idName.length + 5)))
           .includes(`${ idName }.css`)) {
-          string1 += `import './${ idName }.css';`
+          if (!z.match(new RegExp(`[?<=import].*${ idName }.css('|")`))) {
+            string1 += `import './${ idName }.css';`
+          }
         }
-        const z = readFileSync(id)
-          .toString()
         const x = Array.from(new Set(z.match(/El[A-Z][a-z]*/g)))
         if (x.length === 0) return
         for (const i of x) {
@@ -32,7 +34,9 @@ export default function myPlugin () {
             i
             .toLowerCase()
             .slice(2) }/style/css';`
-          string2 += `${ i },`
+          if (!z.match(new RegExp(`import.*${ i }[^{}]*}`, 'g'))) {
+            string2 += `${ i },`
+          }
         }
         return `${ string1 }import {${ string2 }} from 'element-plus';${ z }`
       }
