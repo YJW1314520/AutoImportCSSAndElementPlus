@@ -1,4 +1,5 @@
 # AutoImportCSSAndElementPlus
+# 本插件只适用于基于vite+jsx/tsx的项目
 自动导入与tsx组件同名的css文件，还有element-plus的组件和相应的css文件
 ## 使用示例
 ```ts
@@ -21,3 +22,4 @@ import autoImport from './index.ts'
 // ...
 plugins:[/* ...你自己的插件 */,autoImport()]
 ```
+以后有空了还会尽量完善
