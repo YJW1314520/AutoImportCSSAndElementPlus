@@ -1,23 +1,23 @@
-// [x] 自动引入css文件+自动导入element-plus组件
+// 自动引入css文件+自动导入所需依赖
+// 已经基本完成,正则稍微写好看了一点,逻辑稍微优化了一点.
 import { readFileSync, readdirSync, writeFileSync } from 'fs'
 import { type Plugin } from 'vite'
 
 export default function autoImport (config:{[x:string]:string[]}) {
   // 依据配置自动生成声明文件
   if (!readdirSync('./')
-      .includes('autoImport.d.ts') && !readdirSync('./src')
-      .includes('autoImport.d.ts') && !readdirSync('./src/types/')
-      .includes('autoImport.d.ts') && Object.keys(config).length > 0) {
-    let str = '/* eslint-disable no-unused-vars */'
+    .includes('autoImport.d.ts') && !readdirSync('./src')
+    .includes('autoImport.d.ts') && !readdirSync('./src/types/')
+    .includes('autoImport.d.ts') && Object.keys(config).length > 0) {
+    let str = `/* eslint-disable no-unused-vars */
+`
     for (const [pck, pckExport] of Object.entries(config)) {
-      for (const i of pckExport) {
-        str += `declare let ${ i }:typeof import('${ pck }')['${ i }']
+      for (const exp of pckExport) {
+        str += `declare let ${ exp }:typeof import('${ pck }')['${ exp }']
 `
       }
     }
     writeFileSync('./src/types/autoImport.d.ts', str)
-  } else {
-      console.warn('autoImport.d.ts文件已经存在了')
   }
   return {
     name: 'autoImport', // 插件名
@@ -30,32 +30,56 @@ export default function autoImport (config:{[x:string]:string[]}) {
      */
     load (id) {
       if (id.match(/\.tsx/)) {
-        const z = readFileSync(id)
+        const fileContext = readFileSync(id)
           .toString()
-        let string1 = ''
-        let string2 = ''
+        let cssString = ''
+        let importString = ''
         const matchString = /(?<=\/)[^/]*(?=\.tsx)/
         const idName = id.match(matchString)?.[0]
-        // 尝试着读取该目录下是否有同名css
-        if (idName && readdirSync(id.slice(0, id.length - (idName.length + 5)))
-          .includes(`${ idName }.css`)) {
-          if (!z.match(new RegExp(`[?<=import].*${ idName }.css('|")`))) {
-            string1 += `import './${ idName }.css';`
+        // 尝试着读取该目录下是否有同名css,导入进来
+        if (
+          idName &&
+          readdirSync(id.slice(0, id.length - (idName.length + 5)))
+            .includes(`${ idName }.css`)
+        ) {
+          if (!fileContext.match(new RegExp(`import *['"].*${ idName }.css['"]`))) {
+            cssString += `import './${ idName }.css';`
           }
         }
-        const x = Array.from(new Set(z.match(/El[A-Z][A-Za-z]*/g)))
-        if (x.length === 0) return
-        for (const i of x) {
-          string1 += `import 'element-plus/es/components/${
-            i
-            .replace(/([A-Z])/g, '-$1')
-            .toLowerCase()
-            .slice(4) }/style/css';`
-          if (!z.match(new RegExp(`import.*${ i }[^{}]*}`))) {
-            string2 += `${ i },`
+        for (const [pck, pckExport] of Object.entries(config)) {
+          importString += 'import {'
+          for (const exp of pckExport) {
+            if (
+              !fileContext.match(new RegExp(`import *{[A-Za-z, ]*${ exp }[A-Za-z, ]*} *from *'${ pck }'`)) &&
+              fileContext.match(`${ exp }`)
+            ) {
+              importString += `${ exp },`
+            }
+          }
+          /*
+           * 当某个包的所有依赖都已经被用户手动导入,importString此时等于 '..xxx;import {'
+           * 所以切掉后面8位
+           * 否则就补全
+           */
+          importString.at(importString.length - 1) === '{'
+            ? importString = importString.slice(0, importString.length - 8)
+            : importString += `} from '${ pck }';`
+          // 当包为element-plus时,除了导入组件本身还需引入组件的css
+          if (pck === 'element-plus') {
+            // 匹配ElXyy然后去重
+            const x = Array.from(new Set(fileContext.match(/El[A-Z][A-Za-z]*/g)))
+            // 找不到就跳过匹配
+            if (x.length === 0) continue
+            for (const i of x) {
+              cssString += `import 'element-plus/es/components/${
+                i
+                .replace(/([A-Z])/g, '-$1')
+                .toLowerCase()
+                .slice(4) }/style/css';`
+            }
           }
         }
-        return `${ string1 }import {${ string2 }} from 'element-plus';${ z }`
+        return `${ cssString }${ importString }${ fileContext }`
       }
     }
   } as Plugin
